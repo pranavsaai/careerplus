@@ -101,7 +101,7 @@ export default function ProfilePage() {
   setSelectedTopic(topic);
 
   const res = await fetch(
-    `http://localhost:8080/api/profile/topic-details/${topic}`, {
+    `http://13.223.68.160:8080/api/profile/topic-details/${topic}`, {
       credentials: "include",
     }
   );
@@ -111,7 +111,7 @@ export default function ProfilePage() {
 };
 
   useEffect(() => {
-    const base = "http://localhost:8080/api/profile";
+    const base = "http://13.223.68.160:8080/api/profile";
 
     const load = async () => {
       try {
