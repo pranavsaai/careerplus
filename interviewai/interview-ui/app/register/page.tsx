@@ -30,7 +30,7 @@ export default function RegisterPage() {
 useEffect(() => {
   const checkSession = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/profile/summary", {
+      const res = await fetch("http://13.223.68.160:8080/api/profile/summary", {
         credentials: "include",
         cache: "no-store",
       });
@@ -62,7 +62,7 @@ useEffect(() => {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8080/api/auth/register", {
+      const res = await fetch("http://13.223.68.160:8080/api/auth/register", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
