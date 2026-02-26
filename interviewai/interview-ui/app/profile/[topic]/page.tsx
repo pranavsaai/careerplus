@@ -63,7 +63,7 @@ export default function TopicDetailPage() {
   const detailRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch(`http://13.223.68.160:8080/api/profile/topic-tests/${topic}`,{
+    fetch(`/api/profile/topic-tests/${topic}`,{
       credentials: "include",
     })
       .then(r => r.json())
