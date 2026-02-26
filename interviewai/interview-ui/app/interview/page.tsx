@@ -50,7 +50,7 @@ export default function InterviewPage() {
     if (!topic.trim()) { alert("Please enter a topic."); return; }
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8080/api/interview/start", {
+      const res = await fetch("http://13.223.68.160:8080/api/interview/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -91,7 +91,7 @@ export default function InterviewPage() {
         submittedFeedback = voiceScores.feedback || "Voice-based evaluation";
       }
 
-      const res = await fetch("http://localhost:8080/api/interview/answer", {
+      const res = await fetch("http://13.223.68.160:8080/api/interview/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -121,7 +121,7 @@ export default function InterviewPage() {
       setVoiceTranscript("");
       setVoiceScores(null);
       setSecondsSpent(0);
-      const nextRes = await fetch("http://localhost:8080/api/interview/start", {
+      const nextRes = await fetch("http://13.223.68.160:8080/api/interview/start", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -158,7 +158,7 @@ export default function InterviewPage() {
     setFinalScore(finalAvg);
     setTotalTime(totalSec);
 
-    await fetch("http://localhost:8080/api/interview/complete", {
+    await fetch("http://13.223.68.160:8080/api/interview/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
@@ -199,7 +199,7 @@ export default function InterviewPage() {
         formData.append("testId", testId as string);
         formData.append("questionNumber", String(testResults.length + 1));
 
-        const res = await fetch("http://localhost:8080/api/interview/voice", { method: "POST", body: formData, credentials: "include"});
+        const res = await fetch("http://13.223.68.160:8080/api/interview/voice", { method: "POST", body: formData, credentials: "include"});
         const data = await res.json();
         if (!res.ok) { alert(data.error || "Voice evaluation failed"); return; }
         setVoiceTranscript(data.transcript);
