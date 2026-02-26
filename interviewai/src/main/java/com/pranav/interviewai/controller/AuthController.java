@@ -59,7 +59,7 @@ public ResponseEntity<?> login(
 
     ResponseCookie cookie = ResponseCookie.from("jwt", token)
             .httpOnly(true)
-            .secure(true) 
+            .secure(false) 
             .path("/")
             .maxAge(-1)
             .sameSite("Lax")
