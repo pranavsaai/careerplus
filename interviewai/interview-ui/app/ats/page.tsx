@@ -29,7 +29,7 @@ export default function ATSPage() {
     formData.append("resume", resumeFile);
     formData.append("jobDescription", jobDescription);
     try {
-      const res = await fetch("http://13.223.68.160:8080/api/ats/analyze", {
+      const res = await fetch("/api/ats/analyze", {
         method: "POST",
         body: formData,
         credentials: "include", 
@@ -48,7 +48,7 @@ export default function ATSPage() {
 
   try {
     const res = await fetch(
-      `http://13.223.68.160:8080/api/profile/topic-tests/${encoded}`,{
+      `/api/profile/topic-tests/${encoded}`,{
         credentials: "include",
       }
     );
