@@ -63,7 +63,7 @@ export default function TopicDetailPage() {
   const detailRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch(`http://localhost:8080/api/profile/topic-tests/${topic}`,{
+    fetch(`http://13.223.68.160:8080/api/profile/topic-tests/${topic}`,{
       credentials: "include",
     })
       .then(r => r.json())
@@ -253,7 +253,7 @@ export default function TopicDetailPage() {
                         </div>
                         {selectedQuestion.answerType === "VOICE" ? (
                           <div className={styles.answerBody}>
-                            <audio controls src={`http://localhost:8080${selectedQuestion.audioUrl}`} className={styles.audioPlayer} />
+                            <audio controls src={`http://13.223.68.160:8080${selectedQuestion.audioUrl}`} className={styles.audioPlayer} />
                             <div className={styles.transcript}>
                               <span className={styles.transcriptLabel}>Transcript</span>
                               <p>{selectedQuestion.userAnswer}</p>
