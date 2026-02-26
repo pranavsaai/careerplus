@@ -42,8 +42,7 @@ public class AtsController {
 
         String resumeText = parserService.extractText(resume);
 
-        Map<String, Object> result =
-                atsService.analyze(resumeText, jobDescription);
+        Map<String, Object> result = atsService.analyze(resumeText, jobDescription);
 
         return ResponseEntity.ok(result);
     }
