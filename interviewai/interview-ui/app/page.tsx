@@ -196,7 +196,7 @@ export default function Home() {
   const router = useRouter();
   const handleLogout = async () => {
   try {
-    await fetch("http://localhost:8080/api/auth/logout", {
+    await fetch("http://13.223.68.160:8080/api/auth/logout", {
       method: "POST",
       credentials: "include",
     });
@@ -240,7 +240,7 @@ export default function Home() {
   useEffect(() => {
   const checkAuth = async () => {
     try {
-      const res = await fetch("http://localhost:8080/api/profile/summary", {
+      const res = await fetch("http://13.223.68.160:8080/api/profile/summary", {
         credentials: "include",
         cache: "no-store",
       });
