@@ -17,7 +17,7 @@ export default function LoginPage() {
 useEffect(() => {
   const checkSession = async () => {
     try {
-      const res = await fetch("http://13.223.68.160:8080/api/profile/summary", {
+      const res = await fetch("/api/profile/summary", {
         credentials: "include",
         cache: "no-store",
       });
@@ -56,7 +56,7 @@ useEffect(() => {
     setError("");
     setLoading(true);
     try {
-      const res = await fetch("http://13.223.68.160:8080/api/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
