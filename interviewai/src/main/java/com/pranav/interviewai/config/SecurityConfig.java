@@ -25,6 +25,8 @@ public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .csrf(csrf -> csrf.disable())
+        .formLogin(form -> form.disable())
+        .httpBasic(basic -> basic.disable())
         .sessionManagement(session ->
             session.sessionCreationPolicy(
                 org.springframework.security.config.http.SessionCreationPolicy.STATELESS
