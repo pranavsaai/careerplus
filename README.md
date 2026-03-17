@@ -9,7 +9,5 @@ To enhance system reliability and observability, monitoring was implemented usin
 Overall, the project reflects practical experience in cloud deployment, containerization, web server configuration, and monitoring, demonstrating the ability to design and manage scalable and reliable systems in real-world scenarios.
 
 ## Deployment Access (For Demonstration)
-
 The EC2 instance was accessed using SSH with key-based authentication:
-
 ssh -i <private-key>.pem ubuntu@<ec2-public-ip>
