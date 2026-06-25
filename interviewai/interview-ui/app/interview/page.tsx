@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import styles from "../interview.module.css";
 import ParticleBackground from "../components/ParticleBackground";
 
-export default function InterviewPage() {
+function InterviewPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -50,7 +50,7 @@ export default function InterviewPage() {
     if (!topic.trim()) { alert("Please enter a topic."); return; }
     setLoading(true);
     try {
-      const res = await fetch("http://13.223.68.160:8080/api/interview/start", {
+      const res = await fetch("/api/interview/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -91,16 +91,16 @@ export default function InterviewPage() {
         submittedFeedback = voiceScores.feedback || "Voice-based evaluation";
       }
 
-      const res = await fetch("http://localhost:8080/api/interview/answer", {
+      const res = await fetch("/api/interview/answer", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-        questionId: currentQuestionId,
-        answer: submittedAnswer,
-        testId: testId,
-        questionNumber: testResults.length + 1
-      })
+          questionId: currentQuestionId,
+          answer: submittedAnswer,
+          testId: testId,
+          questionNumber: testResults.length + 1
+        })
       });
 
       if (!res.ok) throw new Error("Failed to save answer");
@@ -121,7 +121,8 @@ export default function InterviewPage() {
       setVoiceTranscript("");
       setVoiceScores(null);
       setSecondsSpent(0);
-      const nextRes = await fetch("http://localhost:8080/api/interview/start", {
+
+      const nextRes = await fetch("/api/interview/start", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -141,46 +142,45 @@ export default function InterviewPage() {
   };
 
   const stopTest = async () => {
-  setTimerActive(false);
-  setLoading(true);
+    setTimerActive(false);
+    setLoading(true);
 
-  try {
-    let avg = 0;
-    let totalSec = 0;
+    try {
+      let avg = 0;
+      let totalSec = 0;
 
-    if (testResults.length > 0) {
-      avg = testResults.reduce((s, r) => s + (r.score || 0), 0) / testResults.length;
-      totalSec = testResults.reduce((s, r) => s + (r.timeSpent || 0), 0);
+      if (testResults.length > 0) {
+        avg = testResults.reduce((s, r) => s + (r.score || 0), 0) / testResults.length;
+        totalSec = testResults.reduce((s, r) => s + (r.timeSpent || 0), 0);
+      }
+
+      const finalAvg = Math.round(avg * 10) / 10;
+
+      setFinalScore(finalAvg);
+      setTotalTime(totalSec);
+
+      await fetch("/api/interview/complete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          topic,
+          difficulty,
+          averageScore: finalAvg,
+          totalTime: totalSec,
+          questions: testResults,
+        }),
+      });
+
+      setTestEnded(true);
+      setTestStarted(false);
+
+    } catch {
+      alert("Error ending test.");
     }
 
-    const finalAvg = Math.round(avg * 10) / 10;
-
-    setFinalScore(finalAvg);
-    setTotalTime(totalSec);
-
-    await fetch("http://localhost:8080/api/interview/complete", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        topic,
-        difficulty,
-        averageScore: finalAvg,
-        totalTime: totalSec,
-        questions: testResults,
-      }),
-    });
-
-    setTestEnded(true);
-    setTestStarted(false);
-
-  } catch {
-    alert("Error ending test.");
-  }
-
-  setLoading(false);
-};
-
+    setLoading(false);
+  };
 
   const startRecording = async () => {
     if (!currentQuestion) { alert("Please generate a question first."); return; }
@@ -199,7 +199,7 @@ export default function InterviewPage() {
         formData.append("testId", testId as string);
         formData.append("questionNumber", String(testResults.length + 1));
 
-        const res = await fetch("http://localhost:8080/api/interview/voice", { method: "POST", body: formData, credentials: "include"});
+        const res = await fetch("/api/interview/voice", { method: "POST", body: formData, credentials: "include" });
         const data = await res.json();
         if (!res.ok) { alert(data.error || "Voice evaluation failed"); return; }
         setVoiceTranscript(data.transcript);
@@ -229,19 +229,15 @@ export default function InterviewPage() {
     return (
       <main className={styles.page}>
         <ParticleBackground />
-
         <button className={styles.backBtn} onClick={() => router.push("/")}>← Home</button>
-
         <div className={styles.tag}>Session Complete</div>
         <h1 className={styles.pageTitle}>Results<span>.</span></h1>
-
         <div className={styles.card}>
           <div className={styles.summaryHero}>
             <div className={styles.summaryScore}>
               {finalScore !== null ? finalScore.toFixed(1) : "—"}<span style={{ fontSize: "2rem", opacity: .4 }}>/10</span>
             </div>
             <div className={styles.summarySubtitle}>Average Score</div>
-
             <div className={styles.summaryMeta}>
               <div className={styles.summaryMetaItem}>
                 <div className={styles.summaryMetaVal}>{testResults.length}</div>
@@ -252,17 +248,12 @@ export default function InterviewPage() {
                 <div className={styles.summaryMetaLbl}>Total Time</div>
               </div>
               <div className={styles.summaryMetaItem}>
-                <div className={styles.summaryMetaVal}>
-                  {testResults.filter(r => r.score >= 8).length}
-                </div>
+                <div className={styles.summaryMetaVal}>{testResults.filter(r => r.score >= 8).length}</div>
                 <div className={styles.summaryMetaLbl}>Excellent</div>
               </div>
             </div>
           </div>
-
           <hr className={styles.divider} />
-
-          {/* Per-question breakdown */}
           <div className={styles.cardLabel}>Question Breakdown</div>
           <div className={styles.resultsList}>
             {testResults.map((r, i) => {
@@ -271,9 +262,7 @@ export default function InterviewPage() {
                 <div className={styles.resultItem} key={i}>
                   <div className={styles.resultHeader}>
                     <p className={styles.resultQuestion}>Q{i + 1}: {r.question}</p>
-                    <span className={`${styles.resultScore} ${styles[`resultScore${lvl}`]}`}>
-                      {r.score}/10
-                    </span>
+                    <span className={`${styles.resultScore} ${styles[`resultScore${lvl}`]}`}>{r.score}/10</span>
                   </div>
                   <div className={styles.resultMeta}>
                     <span className={styles.resultMetaChip}>⏱ {fmt(r.timeSpent)}</span>
@@ -284,7 +273,6 @@ export default function InterviewPage() {
               );
             })}
           </div>
-
           <div style={{ textAlign: "center", marginTop: "32px" }}>
             <button className={styles.btnPrimary} onClick={() => router.push("/profile")}>
               View Full Progress →
@@ -298,39 +286,21 @@ export default function InterviewPage() {
   return (
     <main className={styles.page}>
       <ParticleBackground />
-
       <button className={styles.backBtn} onClick={() => router.push("/")}>← Home</button>
       <div className={styles.tag}>Interview Simulator</div>
       <h1 className={styles.pageTitle}>Practice<span> Mode</span></h1>
 
-      {/* ── Setup ── */}
       {!testStarted ? (
         <div className={styles.setupPanel}>
           <div className={styles.cardLabel}>Configure Session</div>
           <div className={styles.setupGrid}>
             <div className={styles.field}>
               <label className={styles.fieldLabel}>Topic</label>
-              <input
-                type="text"
-                className={styles.select}
-                value={topic}
-                onChange={e => setTopic(e.target.value)}
-                placeholder="e.g. React, Linux, DBMS..."
-              />
+              <input type="text" className={styles.select} value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. React, Linux, DBMS..." />
             </div>
             <div className={styles.field}>
-              <label 
-                htmlFor="difficulty"
-                className={styles.fieldLabel}
-              >
-                Difficulty
-              </label>
-              <select
-                id="difficulty"
-                className={styles.select}
-                value={difficulty}
-                onChange={e => setDifficulty(e.target.value)}
-              >
+              <label htmlFor="difficulty" className={styles.fieldLabel}>Difficulty</label>
+              <select id="difficulty" className={styles.select} value={difficulty} onChange={e => setDifficulty(e.target.value)}>
                 <option value="Easy">Easy</option>
                 <option value="Medium">Medium</option>
                 <option value="Hard">Hard</option>
@@ -343,7 +313,6 @@ export default function InterviewPage() {
         </div>
       ) : (
         <>
-          {/* ── Timer ── */}
           <div className={styles.timerBar}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span className={`${styles.timerDot} ${timerClass}`} />
@@ -352,7 +321,6 @@ export default function InterviewPage() {
             <span className={`${styles.timerValue} ${timerClass}`}>{fmt(secondsSpent)}</span>
           </div>
 
-          {/* Progress */}
           <div className={styles.progressRow}>
             <span className={styles.progressLabel}>Q{testResults.length + 1}</span>
             <div className={styles.progressTrack}>
@@ -361,7 +329,6 @@ export default function InterviewPage() {
             <span className={styles.progressLabel}>{testResults.length} done</span>
           </div>
 
-          {/* ── Question card ── */}
           {currentQuestion && (
             <div className={styles.card}>
               <div className={styles.cardLabel}>
@@ -372,47 +339,29 @@ export default function InterviewPage() {
             </div>
           )}
 
-          {/* ── Answer area ── */}
           {currentQuestion && (
             <>
               <div className={styles.card}>
                 <div className={styles.cardLabel}>Your Answer</div>
                 <div className={styles.answerWrap}>
-                  <textarea
-                    className={styles.answerTextarea}
-                    rows={7}
-                    placeholder="Type your answer here..."
-                    value={answer}
-                    onChange={e => setAnswer(e.target.value)}
-                  />
+                  <textarea className={styles.answerTextarea} rows={7} placeholder="Type your answer here..." value={answer} onChange={e => setAnswer(e.target.value)} />
                   <span className={styles.answerCount}>{answer.length} chars</span>
                 </div>
                 <div className={styles.controlsRow}>
-                  <button 
-                    className={styles.btnGreen} 
-                    onClick={saveAndNext} 
-                    disabled={loading || !canProceed}
-                  >
+                  <button className={styles.btnGreen} onClick={saveAndNext} disabled={loading || !canProceed}>
                     {loading ? "Saving..." : "Save & Next →"}
                   </button>
-                  <button className={styles.stopBtn} onClick={stopTest} disabled={loading}>
-                    ■ End Session
-                  </button>
+                  <button className={styles.stopBtn} onClick={stopTest} disabled={loading}>■ End Session</button>
                 </div>
               </div>
 
-              {/* ── Text evaluation ── */}
               {score !== null && (
                 <div className={`${styles.card} ${styles[`cardBorder${scoreLevel(score)}`]}`}>
                   <div className={styles.cardLabel}>Evaluation</div>
                   <div className={styles.scoreWrap}>
-                    <div className={`${styles.scoreRing} ${styles[`scoreRing${scoreLevel(score)}`]}`}>
-                      {score}
-                    </div>
+                    <div className={`${styles.scoreRing} ${styles[`scoreRing${scoreLevel(score)}`]}`}>{score}</div>
                     <div>
-                      <div className={`${styles.scoreTitle} ${styles[`scoreTitle${scoreLevel(score)}`]}`}>
-                        {scoreLabel(score)}
-                      </div>
+                      <div className={`${styles.scoreTitle} ${styles[`scoreTitle${scoreLevel(score)}`]}`}>{scoreLabel(score)}</div>
                       <div className={styles.scoreSubLabel}>Score out of 10</div>
                     </div>
                   </div>
@@ -421,37 +370,24 @@ export default function InterviewPage() {
                 </div>
               )}
 
-              {/* ── Voice section ── */}
               <div className={styles.card}>
                 <div className={styles.voiceHeader}>
                   <div className={styles.cardLabel} style={{ marginBottom: 0 }}>Voice Mode</div>
-                  {isRecording && (
-                    <div className={styles.listeningBadge}>
-                      <span />
-                      Listening
-                    </div>
-                  )}
+                  {isRecording && (<div className={styles.listeningBadge}><span />Listening</div>)}
                 </div>
-
                 <div className={styles.controlsRow}>
                   {!isRecording ? (
-                    <button className={styles.btnRecord} onClick={startRecording} disabled={!currentQuestion}>
-                      🎙 Start Recording
-                    </button>
+                    <button className={styles.btnRecord} onClick={startRecording} disabled={!currentQuestion}>🎙 Start Recording</button>
                   ) : (
-                    <button className={`${styles.btnRecord} ${styles.btnRecordActive}`} onClick={stopRecording}>
-                      ⏹ Stop Recording
-                    </button>
+                    <button className={`${styles.btnRecord} ${styles.btnRecordActive}`} onClick={stopRecording}>⏹ Stop Recording</button>
                   )}
                 </div>
-
                 {voiceTranscript && (
                   <>
                     <div className={styles.cardLabel} style={{ marginTop: 20 }}>Transcript</div>
                     <div className={styles.transcriptBox}>{voiceTranscript}</div>
                   </>
                 )}
-
                 {voiceScores && (
                   <>
                     <div className={styles.cardLabel} style={{ marginTop: 8 }}>Voice Evaluation</div>
@@ -465,18 +401,12 @@ export default function InterviewPage() {
                       ].map((m, i) => (
                         <div className={styles.metricCard} key={i}>
                           <div className={styles.metricLabel}>{m.label}</div>
-                          <div className={`${styles.metricVal} ${
-                            m.val >= 8 ? styles.metricValGood : m.val >= 5 ? styles.metricValMedium : styles.metricValBad
-                          }`}>{m.val}</div>
+                          <div className={`${styles.metricVal} ${m.val >= 8 ? styles.metricValGood : m.val >= 5 ? styles.metricValMedium : styles.metricValBad}`}>{m.val}</div>
                         </div>
                       ))}
                       <div className={`${styles.metricCard} ${styles.metricOverall}`}>
                         <div className={styles.metricLabel}>Overall Voice Score</div>
-                        <div className={`${styles.metricVal} ${
-                          voiceScores.overallScore >= 8 ? styles.metricValGood
-                          : voiceScores.overallScore >= 5 ? styles.metricValMedium
-                          : styles.metricValBad
-                        }`}>{voiceScores.overallScore} / 10</div>
+                        <div className={`${styles.metricVal} ${voiceScores.overallScore >= 8 ? styles.metricValGood : voiceScores.overallScore >= 5 ? styles.metricValMedium : styles.metricValBad}`}>{voiceScores.overallScore} / 10</div>
                       </div>
                     </div>
                     <hr className={styles.divider} />
@@ -489,5 +419,18 @@ export default function InterviewPage() {
         </>
       )}
     </main>
+  );
+}
+
+// Suspense wrapper — fixes useSearchParams build error
+export default function Page() {
+  return (
+    <Suspense fallback={
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh", background: "#0a0a0a", color: "#fff", fontSize: "1.2rem" }}>
+        Loading Interview...
+      </div>
+    }>
+      <InterviewPage />
+    </Suspense>
   );
 }
