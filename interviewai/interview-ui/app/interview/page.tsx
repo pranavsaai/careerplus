@@ -50,7 +50,7 @@ export default function InterviewPage() {
     if (!topic.trim()) { alert("Please enter a topic."); return; }
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:8080/api/interview/start", {
+      const res = await fetch("http://13.223.68.160:8080/api/interview/start", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
