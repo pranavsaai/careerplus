@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.pranav.interviewai.entity.ResumeProfile;
 import com.pranav.interviewai.repository.ResumeProfileRepository;
-import lombok.RequiredArgsConstructor;
 import okhttp3.*;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
@@ -22,8 +21,6 @@ import java.util.Map;
 public class ResumeService {
 
     private final ResumeProfileRepository resumeRepo;
-
-    // ObjectMapper manually instantiated — no Spring injection needed
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${groq.api.key}")
@@ -36,7 +33,6 @@ public class ResumeService {
         this.resumeRepo = resumeRepo;
     }
 
-    // step 1 — extract text from PDF using PDFBox
     public String extractTextFromPdf(MultipartFile file) throws Exception {
         try (InputStream is = file.getInputStream();
              PDDocument doc = PDDocument.load(is)) {
@@ -45,8 +41,11 @@ public class ResumeService {
         }
     }
 
-    // step 2 — send to Groq, get structured JSON back
     public ResumeProfile analyzeResume(String userId, String rawText) throws Exception {
+
+        // trim to 3000 chars to avoid token limit
+        String trimmed = rawText.length() > 3000
+            ? rawText.substring(0, 3000) : rawText;
 
         String prompt = """
             You are a resume parser. Analyze the resume text below and return ONLY a valid JSON object.
@@ -70,9 +69,9 @@ public class ResumeService {
             - technologies: databases, cloud, DevOps tools
             - experienceLevel: one of Fresher / Junior / Mid / Senior
             - projects: project names only
-            - dominantDomain: overall area (Full Stack / ML / DevOps / Backend / Frontend / Data)
+            - dominantDomain: one of Full Stack / ML / DevOps / Backend / Frontend / Data
             - suggestedTopics: 5-8 interview topics based on their background
-            """.formatted(rawText.substring(0, Math.min(rawText.length(), 3000)));
+            """.formatted(trimmed);
 
         String reqBody = objectMapper.writeValueAsString(Map.of(
             "model", "llama3-8b-8192",
@@ -84,7 +83,11 @@ public class ResumeService {
             "max_tokens", 800
         ));
 
-        OkHttpClient client = new OkHttpClient();
+        OkHttpClient client = new OkHttpClient.Builder()
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(60, java.util.concurrent.TimeUnit.SECONDS)
+            .build();
+
         Request req = new Request.Builder()
             .url(GROQ_URL)
             .addHeader("Authorization", "Bearer " + groqApiKey)
@@ -93,13 +96,37 @@ public class ResumeService {
             .build();
 
         try (Response res = client.newCall(req).execute()) {
+            if (!res.isSuccessful()) {
+                throw new Exception("Groq API error: " + res.code() + " " + res.message());
+            }
+
             String body = res.body().string();
             JsonNode root = objectMapper.readTree(body);
-            String content = root.path("choices").get(0)
-                .path("message").path("content").asText();
 
-            // clean any accidental markdown fences
-            content = content.replaceAll("```json|```", "").trim();
+            // safe null check on choices
+            JsonNode choices = root.path("choices");
+            if (choices.isNull() || !choices.isArray() || choices.size() == 0) {
+                throw new Exception("Groq returned empty choices. Response: " + body);
+            }
+
+            String content = choices.get(0)
+                .path("message")
+                .path("content")
+                .asText("");
+
+            if (content.isBlank()) {
+                throw new Exception("Groq returned empty content");
+            }
+
+            // clean markdown fences if any
+            content = content.replaceAll("(?s)```json|```", "").trim();
+
+            // extract JSON object if extra text around it
+            int start = content.indexOf("{");
+            int end = content.lastIndexOf("}");
+            if (start != -1 && end != -1) {
+                content = content.substring(start, end + 1);
+            }
 
             JsonNode parsed = objectMapper.readTree(content);
 
@@ -107,7 +134,6 @@ public class ResumeService {
             profile.setUserId(userId);
             profile.setRawText(rawText);
             profile.setUploadedAt(LocalDateTime.now());
-
             profile.setSkills(toList(parsed.path("skills")));
             profile.setTechnologies(toList(parsed.path("technologies")));
             profile.setExperienceLevel(parsed.path("experienceLevel").asText("Fresher"));
@@ -121,7 +147,7 @@ public class ResumeService {
 
     private List<String> toList(JsonNode node) {
         List<String> list = new ArrayList<>();
-        if (node.isArray()) {
+        if (node != null && node.isArray()) {
             node.forEach(n -> list.add(n.asText()));
         }
         return list;
