@@ -8,7 +8,8 @@ import styles from "../topic.module.css";
 function Markdown({ text }: { text: string }) {
   if (!text) return <span style={{ color: "#64748b" }}>—</span>;
 
-  const lines = text.split("\n");
+  // handle both real newlines and literal \n strings
+  const lines = text.replace(/\\n/g, "\n").split("\n");
   const elements: React.ReactNode[] = [];
   let codeBlock = false;
   let codeLines: string[] = [];
