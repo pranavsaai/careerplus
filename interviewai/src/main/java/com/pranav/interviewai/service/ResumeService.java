@@ -74,7 +74,7 @@ public class ResumeService {
             """.formatted(trimmed);
 
         String reqBody = objectMapper.writeValueAsString(Map.of(
-            "model", "llama3-8b-8192",
+            "model", "llama-3.3-70b-versatile",
             "messages", List.of(Map.of(
                 "role", "user",
                 "content", prompt
