@@ -124,12 +124,14 @@ function InterviewPage() {
       setVoiceScores(null);
       setSecondsSpent(0);
 
-      // adaptive difficulty — score based ga auto adjust cheyyi!
+      // adaptive difficulty — backend score use cheyyi
+      const actualScore = data.score ?? submittedScore ?? 0;
       const adaptedDifficulty =
-        (submittedScore ?? data.score) >= 8 ? "Hard" :
-        (submittedScore ?? data.score) <= 4 ? "Easy" : "Medium";
+        actualScore >= 8 ? "Hard" :
+        actualScore <= 4 ? "Easy" : "Medium";
 
-      setDifficulty(adaptedDifficulty); // UI lo kuda update avutundi
+      setDifficulty(adaptedDifficulty);
+      console.log("Score:", actualScore, "→ Difficulty:", adaptedDifficulty);
 
       const nextRes = await fetch("/api/interview/start", {
         method: "POST",
@@ -234,6 +236,7 @@ function InterviewPage() {
 
   const timerClass = secondsSpent > 300 ? styles.danger : secondsSpent > 180 ? styles.warning : "";
 
+  // ── Results page ────────────────────────────────────────────────────────
   if (testEnded) {
     return (
       <main className={styles.page}>
@@ -282,32 +285,28 @@ function InterviewPage() {
               );
             })}
           </div>
+
+          {/* buttons */}
           <div style={{ textAlign: "center", marginTop: "32px" }}>
             <button className={styles.btnPrimary} onClick={() => router.push("/profile")}>
               View Full Progress →
             </button>
           </div>
-          <div style={{ textAlign: "center", marginTop: "32px" }}>
-          <button className={styles.btnPrimary} onClick={() => router.push("/profile")}>
-            View Full Progress →
-          </button>
-        </div>
-
-        {/* PDF Report Download */}
-        <div style={{ textAlign: "center", marginTop: "16px" }}>
-          <ReportGenerator
-            topic={topic}
-            difficulty={difficulty}
-            finalScore={finalScore ?? 0}
-            totalTime={totalTime}
-            testResults={testResults}
-          />
-        </div>
+          <div style={{ textAlign: "center", marginTop: "16px" }}>
+            <ReportGenerator
+              topic={topic}
+              difficulty={difficulty}
+              finalScore={finalScore ?? 0}
+              totalTime={totalTime}
+              testResults={testResults}
+            />
+          </div>
         </div>
       </main>
     );
   }
 
+  // ── Interview page ──────────────────────────────────────────────────────
   return (
     <main className={styles.page}>
       <ParticleBackground />
@@ -321,11 +320,13 @@ function InterviewPage() {
           <div className={styles.setupGrid}>
             <div className={styles.field}>
               <label className={styles.fieldLabel}>Topic</label>
-              <input type="text" className={styles.select} value={topic} onChange={e => setTopic(e.target.value)} placeholder="e.g. React, Linux, DBMS..." />
+              <input type="text" className={styles.select} value={topic}
+                onChange={e => setTopic(e.target.value)} placeholder="e.g. React, Linux, DBMS..." />
             </div>
             <div className={styles.field}>
               <label htmlFor="difficulty" className={styles.fieldLabel}>Difficulty</label>
-              <select id="difficulty" className={styles.select} value={difficulty} onChange={e => setDifficulty(e.target.value)}>
+              <select id="difficulty" className={styles.select} value={difficulty}
+                onChange={e => setDifficulty(e.target.value)}>
                 <option value="Easy">Easy</option>
                 <option value="Medium">Medium</option>
                 <option value="Hard">Hard</option>
@@ -338,12 +339,12 @@ function InterviewPage() {
         </div>
       ) : (
         <>
+          {/* Timer bar with adaptive difficulty badge */}
           <div className={styles.timerBar}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span className={`${styles.timerDot} ${timerClass}`} />
               <span className={styles.timerLabel}>Time on question</span>
             </div>
-            {/* difficulty badge here */}
             <span style={{
               fontSize: "11px",
               padding: "3px 10px",
@@ -381,7 +382,9 @@ function InterviewPage() {
               <div className={styles.card}>
                 <div className={styles.cardLabel}>Your Answer</div>
                 <div className={styles.answerWrap}>
-                  <textarea className={styles.answerTextarea} rows={7} placeholder="Type your answer here..." value={answer} onChange={e => setAnswer(e.target.value)} />
+                  <textarea className={styles.answerTextarea} rows={7}
+                    placeholder="Type your answer here..." value={answer}
+                    onChange={e => setAnswer(e.target.value)} />
                   <span className={styles.answerCount}>{answer.length} chars</span>
                 </div>
                 <div className={styles.controlsRow}>
@@ -393,24 +396,20 @@ function InterviewPage() {
               </div>
 
               {score !== null && (
-              <div className={`${styles.card} ${styles[`cardBorder${scoreLevel(score)}`]}`}>
-                <div className={styles.cardLabel}>Evaluation</div>
-                <div className={styles.scoreWrap}>
-                  <div className={`${styles.scoreRing} ${styles[`scoreRing${scoreLevel(score)}`]}`}>{score}</div>
-                  <div>
-                    <div className={`${styles.scoreTitle} ${styles[`scoreTitle${scoreLevel(score)}`]}`}>{scoreLabel(score)}</div>
-                    <div className={styles.scoreSubLabel}>Score out of 10</div>
+                <div className={`${styles.card} ${styles[`cardBorder${scoreLevel(score)}`]}`}>
+                  <div className={styles.cardLabel}>Evaluation</div>
+                  <div className={styles.scoreWrap}>
+                    <div className={`${styles.scoreRing} ${styles[`scoreRing${scoreLevel(score)}`]}`}>{score}</div>
+                    <div>
+                      <div className={`${styles.scoreTitle} ${styles[`scoreTitle${scoreLevel(score)}`]}`}>{scoreLabel(score)}</div>
+                      <div className={styles.scoreSubLabel}>Score out of 10</div>
+                    </div>
                   </div>
+                  <hr className={styles.divider} />
+                  <p className={styles.feedbackText}>{feedback}</p>
+                  <StreamFeedback questionId={currentQuestionId} answer={answer} />
                 </div>
-                <hr className={styles.divider} />
-                <p className={styles.feedbackText}>{feedback}</p>
-
-                <StreamFeedback
-                  questionId={currentQuestionId}
-                  answer={answer}
-                />
-              </div>
-            )}
+              )}
 
               <div className={styles.card}>
                 <div className={styles.voiceHeader}>
@@ -419,9 +418,13 @@ function InterviewPage() {
                 </div>
                 <div className={styles.controlsRow}>
                   {!isRecording ? (
-                    <button className={styles.btnRecord} onClick={startRecording} disabled={!currentQuestion}>🎙 Start Recording</button>
+                    <button className={styles.btnRecord} onClick={startRecording} disabled={!currentQuestion}>
+                      🎙 Start Recording
+                    </button>
                   ) : (
-                    <button className={`${styles.btnRecord} ${styles.btnRecordActive}`} onClick={stopRecording}>⏹ Stop Recording</button>
+                    <button className={`${styles.btnRecord} ${styles.btnRecordActive}`} onClick={stopRecording}>
+                      ⏹ Stop Recording
+                    </button>
                   )}
                 </div>
                 {voiceTranscript && (
@@ -448,7 +451,9 @@ function InterviewPage() {
                       ))}
                       <div className={`${styles.metricCard} ${styles.metricOverall}`}>
                         <div className={styles.metricLabel}>Overall Voice Score</div>
-                        <div className={`${styles.metricVal} ${voiceScores.overallScore >= 8 ? styles.metricValGood : voiceScores.overallScore >= 5 ? styles.metricValMedium : styles.metricValBad}`}>{voiceScores.overallScore} / 10</div>
+                        <div className={`${styles.metricVal} ${voiceScores.overallScore >= 8 ? styles.metricValGood : voiceScores.overallScore >= 5 ? styles.metricValMedium : styles.metricValBad}`}>
+                          {voiceScores.overallScore} / 10
+                        </div>
                       </div>
                     </div>
                     <hr className={styles.divider} />
@@ -464,7 +469,6 @@ function InterviewPage() {
   );
 }
 
-// Suspense wrapper — fixes useSearchParams build error
 export default function Page() {
   return (
     <Suspense fallback={
