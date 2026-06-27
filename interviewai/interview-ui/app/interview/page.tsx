@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import styles from "../interview.module.css";
 import ParticleBackground from "../components/ParticleBackground";
 import StreamFeedback from "./StreamFeedBack";
+import ReportGenerator from "./ReportGenerator";
 
 function InterviewPage() {
   const searchParams = useSearchParams();
@@ -279,6 +280,22 @@ function InterviewPage() {
               View Full Progress →
             </button>
           </div>
+          <div style={{ textAlign: "center", marginTop: "32px" }}>
+          <button className={styles.btnPrimary} onClick={() => router.push("/profile")}>
+            View Full Progress →
+          </button>
+        </div>
+
+        {/* PDF Report Download */}
+        <div style={{ textAlign: "center", marginTop: "16px" }}>
+          <ReportGenerator
+            topic={topic}
+            difficulty={difficulty}
+            finalScore={finalScore ?? 0}
+            totalTime={totalTime}
+            testResults={testResults}
+          />
+        </div>
         </div>
       </main>
     );
