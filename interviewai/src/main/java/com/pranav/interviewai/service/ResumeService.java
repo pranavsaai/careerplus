@@ -16,19 +16,25 @@ import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
-@RequiredArgsConstructor
 public class ResumeService {
 
     private final ResumeProfileRepository resumeRepo;
-    private final ObjectMapper objectMapper;
+
+    // ObjectMapper manually instantiated — no Spring injection needed
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Value("${groq.api.key}")
     private String groqApiKey;
 
     private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     private static final MediaType JSON_TYPE = MediaType.get("application/json; charset=utf-8");
+
+    public ResumeService(ResumeProfileRepository resumeRepo) {
+        this.resumeRepo = resumeRepo;
+    }
 
     // step 1 — extract text from PDF using PDFBox
     public String extractTextFromPdf(MultipartFile file) throws Exception {
@@ -68,9 +74,9 @@ public class ResumeService {
             - suggestedTopics: 5-8 interview topics based on their background
             """.formatted(rawText.substring(0, Math.min(rawText.length(), 3000)));
 
-        String reqBody = objectMapper.writeValueAsString(java.util.Map.of(
+        String reqBody = objectMapper.writeValueAsString(Map.of(
             "model", "llama3-8b-8192",
-            "messages", List.of(java.util.Map.of(
+            "messages", List.of(Map.of(
                 "role", "user",
                 "content", prompt
             )),
@@ -113,7 +119,6 @@ public class ResumeService {
         }
     }
 
-    // helper — JsonNode array to List<String>
     private List<String> toList(JsonNode node) {
         List<String> list = new ArrayList<>();
         if (node.isArray()) {
@@ -122,7 +127,6 @@ public class ResumeService {
         return list;
     }
 
-    // get latest resume profile for user
     public ResumeProfile getLatestProfile(String userId) {
         return resumeRepo.findTopByUserIdOrderByUploadedAtDesc(userId)
             .orElse(null);
