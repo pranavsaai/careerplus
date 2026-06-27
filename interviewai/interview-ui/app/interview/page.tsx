@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import styles from "../interview.module.css";
 import ParticleBackground from "../components/ParticleBackground";
+import StreamFeedback from "./StreamFeedBack";
 
 function InterviewPage() {
   const searchParams = useSearchParams();
@@ -356,19 +357,24 @@ function InterviewPage() {
               </div>
 
               {score !== null && (
-                <div className={`${styles.card} ${styles[`cardBorder${scoreLevel(score)}`]}`}>
-                  <div className={styles.cardLabel}>Evaluation</div>
-                  <div className={styles.scoreWrap}>
-                    <div className={`${styles.scoreRing} ${styles[`scoreRing${scoreLevel(score)}`]}`}>{score}</div>
-                    <div>
-                      <div className={`${styles.scoreTitle} ${styles[`scoreTitle${scoreLevel(score)}`]}`}>{scoreLabel(score)}</div>
-                      <div className={styles.scoreSubLabel}>Score out of 10</div>
-                    </div>
+              <div className={`${styles.card} ${styles[`cardBorder${scoreLevel(score)}`]}`}>
+                <div className={styles.cardLabel}>Evaluation</div>
+                <div className={styles.scoreWrap}>
+                  <div className={`${styles.scoreRing} ${styles[`scoreRing${scoreLevel(score)}`]}`}>{score}</div>
+                  <div>
+                    <div className={`${styles.scoreTitle} ${styles[`scoreTitle${scoreLevel(score)}`]}`}>{scoreLabel(score)}</div>
+                    <div className={styles.scoreSubLabel}>Score out of 10</div>
                   </div>
-                  <hr className={styles.divider} />
-                  <p className={styles.feedbackText}>{feedback}</p>
                 </div>
-              )}
+                <hr className={styles.divider} />
+                <p className={styles.feedbackText}>{feedback}</p>
+
+                <StreamFeedback
+                  questionId={currentQuestionId}
+                  answer={answer}
+                />
+              </div>
+            )}
 
               <div className={styles.card}>
                 <div className={styles.voiceHeader}>

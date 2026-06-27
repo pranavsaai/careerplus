@@ -17,14 +17,14 @@ import com.pranav.interviewai.service.InterviewService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 
-import jakarta.servlet.http.HttpServletRequest;
-
 import lombok.RequiredArgsConstructor;
 
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.File;
 import java.time.LocalDateTime;
@@ -38,40 +38,73 @@ public class InterviewController {
     private final InterviewService service;
     private final DeepgramService deepgramService;
     private final GroqService groqService;
-
     private final QuestionRepository questionRepo;
     private final SessionRepository sessionRepo;
     private final InterviewAttemptRepository attemptRepository;
-    private final UserRepository userRepo;   
-    private User getCurrentUser() {
-        String email = SecurityContextHolder
-                .getContext()
-                .getAuthentication()
-                .getName();
+    private final UserRepository userRepo;
 
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext()
+                .getAuthentication().getName();
         return userRepo.findByEmail(email).orElseThrow();
     }
-    @PostMapping("/start")
-    public ResponseEntity<?> start(
-            @RequestBody StartInterviewRequest req) {
-                User user = getCurrentUser();
 
+    @PostMapping("/start")
+    public ResponseEntity<?> start(@RequestBody StartInterviewRequest req) {
+        User user = getCurrentUser();
         return ResponseEntity.ok(service.start(req, user.getId()));
     }
-    @PostMapping("/answer")
-    public ResponseEntity<?> answer(
-            @RequestBody SubmitAnswerRequest req) {
-                User user = getCurrentUser();
 
+    @PostMapping("/answer")
+    public ResponseEntity<?> answer(@RequestBody SubmitAnswerRequest req) {
+        User user = getCurrentUser();
         return ResponseEntity.ok(service.submitAnswer(req, user.getId()));
     }
+
+    // NEW — streaming feedback endpoint
+    @GetMapping(value = "/stream-feedback", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamFeedback(
+            @RequestParam("questionId") String questionId,
+            @RequestParam("answer") String answer) {
+
+        SseEmitter emitter = new SseEmitter(60_000L); // 60s timeout
+
+        try {
+            User user = getCurrentUser();
+            Question question = questionRepo.findById(questionId).orElseThrow();
+            Session session = sessionRepo.findById(question.getSessionId()).orElseThrow();
+
+            if (!session.getUserId().equals(user.getId())) {
+                emitter.send(SseEmitter.event().name("error").data("Unauthorized"));
+                emitter.complete();
+                return emitter;
+            }
+
+            // stream feedback word by word
+            groqService.streamEvaluationFeedback(
+                question.getQuestionText(),
+                answer,
+                emitter
+            );
+
+        } catch (Exception e) {
+            try {
+                emitter.send(SseEmitter.event().name("error").data(e.getMessage()));
+                emitter.complete();
+            } catch (Exception ignored) {}
+        }
+
+        return emitter;
+    }
+
     @PostMapping("/voice")
     public ResponseEntity<?> handleVoice(
             @RequestParam("file") MultipartFile file,
             @RequestParam("questionId") String questionId,
             @RequestParam("testId") String testId,
             @RequestParam("questionNumber") int questionNumber) throws Exception {
-                User user = getCurrentUser();
+
+        User user = getCurrentUser();
 
         String fileName = java.util.UUID.randomUUID() + ".webm";
         java.nio.file.Path uploadDir = java.nio.file.Paths.get("uploads/audio");
@@ -97,14 +130,8 @@ public class InterviewController {
         Question question = questionRepo.findById(questionId).orElseThrow();
         Session session = sessionRepo.findById(question.getSessionId()).orElseThrow();
 
-        String evaluation =
-                groqService.evaluateVoiceAnswer(
-                        question.getQuestionText(),
-                        transcript
-                );
-
-        String modelAnswer =
-                groqService.generateModelAnswer(question.getQuestionText());
+        String evaluation = groqService.evaluateVoiceAnswer(question.getQuestionText(), transcript);
+        String modelAnswer = groqService.generateModelAnswer(question.getQuestionText());
 
         ObjectMapper mapper = new ObjectMapper();
         JsonNode node = mapper.readTree(evaluation);
@@ -114,52 +141,43 @@ public class InterviewController {
         int fluencyScore = node.get("fluencyScore").asInt();
         int keywordScore = node.get("keywordScore").asInt();
         int clarityScore = node.get("clarityScore").asInt();
-
-        int overallScore =
-                (contentScore
-                        + grammarScore
-                        + fluencyScore
-                        + keywordScore
-                        + clarityScore) / 5;
+        int overallScore = (contentScore + grammarScore + fluencyScore + keywordScore + clarityScore) / 5;
 
         InterviewAttempt attempt = new InterviewAttempt();
         attempt.setUserId(user.getId());
-
         attempt.setTopic(session.getTopic());
         attempt.setDifficulty(session.getDifficulty());
-
         attempt.setQuestion(question.getQuestionText());
         attempt.setUserAnswer(transcript);
         attempt.setModelAnswer(modelAnswer);
         attempt.setFeedback(node.get("feedback").asText());
-
         attempt.setAnswerType("VOICE");
         attempt.setAudioUrl("/audio/" + fileName);
-
         attempt.setVoiceScore(overallScore);
         attempt.setContentScore(contentScore);
         attempt.setGrammarScore(grammarScore);
         attempt.setFluencyScore(fluencyScore);
         attempt.setKeywordScore(keywordScore);
         attempt.setClarityScore(clarityScore);
-
         attempt.setTestId(testId);
         attempt.setQuestionNumber(questionNumber);
         attempt.setCreatedAt(LocalDateTime.now());
-
         attemptRepository.save(attempt);
 
-        return ResponseEntity.ok(
-                Map.of(
-                        "transcript", transcript,
-                        "contentScore", contentScore,
-                        "grammarScore", grammarScore,
-                        "fluencyScore", fluencyScore,
-                        "keywordScore", keywordScore,
-                        "clarityScore", clarityScore,
-                        "overallScore", overallScore,
-                        "feedback", node.get("feedback").asText()
-                )
-        );
+        return ResponseEntity.ok(Map.of(
+                "transcript", transcript,
+                "contentScore", contentScore,
+                "grammarScore", grammarScore,
+                "fluencyScore", fluencyScore,
+                "keywordScore", keywordScore,
+                "clarityScore", clarityScore,
+                "overallScore", overallScore,
+                "feedback", node.get("feedback").asText()
+        ));
+    }
+
+    @PostMapping("/complete")
+    public ResponseEntity<?> complete(@RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(Map.of("status", "completed"));
     }
 }
