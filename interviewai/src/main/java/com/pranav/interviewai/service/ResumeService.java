@@ -97,7 +97,8 @@ public class ResumeService {
 
         try (Response res = client.newCall(req).execute()) {
             if (!res.isSuccessful()) {
-                throw new Exception("Groq API error: " + res.code() + " " + res.message());
+                String errBody = res.body() != null ? res.body().string() : "no body";
+                throw new Exception("Groq API error: " + res.code() + " body: " + errBody);
             }
 
             String body = res.body().string();
