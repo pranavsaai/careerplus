@@ -124,11 +124,18 @@ function InterviewPage() {
       setVoiceScores(null);
       setSecondsSpent(0);
 
+      // adaptive difficulty — score based ga auto adjust cheyyi!
+      const adaptedDifficulty =
+        (submittedScore ?? data.score) >= 8 ? "Hard" :
+        (submittedScore ?? data.score) <= 4 ? "Easy" : "Medium";
+
+      setDifficulty(adaptedDifficulty); // UI lo kuda update avutundi
+
       const nextRes = await fetch("/api/interview/start", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic, difficulty }),
+        body: JSON.stringify({ topic, difficulty: adaptedDifficulty }),
       });
       const nextData = await nextRes.json();
 
@@ -336,6 +343,18 @@ function InterviewPage() {
               <span className={`${styles.timerDot} ${timerClass}`} />
               <span className={styles.timerLabel}>Time on question</span>
             </div>
+            {/* difficulty badge here */}
+            <span style={{
+              fontSize: "11px",
+              padding: "3px 10px",
+              borderRadius: "20px",
+              fontWeight: 700,
+              background: difficulty === "Hard" ? "rgba(244,63,94,0.15)" : difficulty === "Easy" ? "rgba(52,211,153,0.15)" : "rgba(129,140,248,0.15)",
+              color: difficulty === "Hard" ? "#f43f5e" : difficulty === "Easy" ? "#34d399" : "#818cf8",
+              border: `1px solid ${difficulty === "Hard" ? "#f43f5e" : difficulty === "Easy" ? "#34d399" : "#818cf8"}`,
+            }}>
+              {difficulty} {difficulty === "Hard" ? "🔥" : difficulty === "Easy" ? "✅" : "⚡"}
+            </span>
             <span className={`${styles.timerValue} ${timerClass}`}>{fmt(secondsSpent)}</span>
           </div>
 
