@@ -6,6 +6,8 @@ import styles from "../interview.module.css";
 import ParticleBackground from "../components/ParticleBackground";
 import StreamFeedback from "./StreamFeedBack";
 import ReportGenerator from "./ReportGenerator";
+import { useInterviewSocket } from "./useInterviewSocket";
+import AIStatusIndicator from "./AIStatusIndicator";
 
 function InterviewPage() {
   const searchParams = useSearchParams();
@@ -39,6 +41,7 @@ function InterviewPage() {
   const [voiceScores, setVoiceScores] = useState<any>(null);
 
   const [loading, setLoading] = useState(false);
+  const { status, lastMessage } = useInterviewSocket(null); 
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -340,6 +343,7 @@ function InterviewPage() {
       ) : (
         <>
           {/* Timer bar with adaptive difficulty badge */}
+          <AIStatusIndicator status={status} message={lastMessage?.message} />
           <div className={styles.timerBar}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span className={`${styles.timerDot} ${timerClass}`} />
