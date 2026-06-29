@@ -78,7 +78,8 @@ public class EmailService {
 
         } catch (Exception e) {
             // don't block registration if email fails
-            System.err.println("Email send failed: " + e.getMessage());
+            e.printStackTrace();
+            System.err.println("Email send failed: " + e.getClass().getName() + " - " + e.getMessage());
         }
     }
 }
