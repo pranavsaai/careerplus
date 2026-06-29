@@ -13,6 +13,7 @@ import com.pranav.interviewai.repository.UserRepository;
 import com.pranav.interviewai.service.DeepgramService;
 import com.pranav.interviewai.service.GroqService;
 import com.pranav.interviewai.service.InterviewService;
+import com.pranav.interviewai.service.RateLimiterService;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -42,6 +43,7 @@ public class InterviewController {
     private final SessionRepository sessionRepo;
     private final InterviewAttemptRepository attemptRepository;
     private final UserRepository userRepo;
+    private final RateLimiterService rateLimiter; // NEW
 
     private User getCurrentUser() {
         String email = SecurityContextHolder.getContext()
@@ -52,25 +54,50 @@ public class InterviewController {
     @PostMapping("/start")
     public ResponseEntity<?> start(@RequestBody StartInterviewRequest req) {
         User user = getCurrentUser();
+
+        // rate limit check — 10 requests per minute
+        if (!rateLimiter.tryConsume(user.getId())) {
+            return ResponseEntity.status(429).body(Map.of(
+                "error", "Too many requests! Please wait a moment before starting another question.",
+                "retryAfter", "60 seconds"
+            ));
+        }
+
         return ResponseEntity.ok(service.start(req, user.getId()));
     }
 
     @PostMapping("/answer")
     public ResponseEntity<?> answer(@RequestBody SubmitAnswerRequest req) {
         User user = getCurrentUser();
+
+        if (!rateLimiter.tryConsume(user.getId())) {
+            return ResponseEntity.status(429).body(Map.of(
+                "error", "Too many requests! Slow down a bit.",
+                "retryAfter", "60 seconds"
+            ));
+        }
+
         return ResponseEntity.ok(service.submitAnswer(req, user.getId()));
     }
 
-    // NEW — streaming feedback endpoint
+    // streaming feedback endpoint
     @GetMapping(value = "/stream-feedback", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamFeedback(
             @RequestParam("questionId") String questionId,
             @RequestParam("answer") String answer) {
 
-        SseEmitter emitter = new SseEmitter(60_000L); // 60s timeout
+        SseEmitter emitter = new SseEmitter(60_000L);
 
         try {
             User user = getCurrentUser();
+
+            // rate limit check for streaming too
+            if (!rateLimiter.tryConsume(user.getId())) {
+                emitter.send(SseEmitter.event().name("error").data("Rate limit exceeded"));
+                emitter.complete();
+                return emitter;
+            }
+
             Question question = questionRepo.findById(questionId).orElseThrow();
             Session session = sessionRepo.findById(question.getSessionId()).orElseThrow();
 
@@ -80,7 +107,6 @@ public class InterviewController {
                 return emitter;
             }
 
-            // stream feedback word by word
             groqService.streamEvaluationFeedback(
                 question.getQuestionText(),
                 answer,
@@ -105,6 +131,14 @@ public class InterviewController {
             @RequestParam("questionNumber") int questionNumber) throws Exception {
 
         User user = getCurrentUser();
+
+        // rate limit voice too — expensive operation!
+        if (!rateLimiter.tryConsume(user.getId())) {
+            return ResponseEntity.status(429).body(Map.of(
+                "error", "Too many requests! Please wait before recording again.",
+                "retryAfter", "60 seconds"
+            ));
+        }
 
         String fileName = java.util.UUID.randomUUID() + ".webm";
         java.nio.file.Path uploadDir = java.nio.file.Paths.get("uploads/audio");
