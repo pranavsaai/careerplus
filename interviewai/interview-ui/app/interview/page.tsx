@@ -43,14 +43,16 @@ function InterviewPage() {
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
+  // fetch userId for WebSocket
   useEffect(() => {
     fetch("/api/profile/summary", { credentials: "include" })
       .then(r => r.json())
-      .then(d => setUserId(d.userId))
+      .then(d => { if (d.userId) setUserId(d.userId); })
       .catch(() => {});
   }, []);
 
-  const { status, lastMessage } = useInterviewSocket(userId);
+  // WebSocket — only connect when interview started!
+  const { status, lastMessage } = useInterviewSocket(testStarted ? userId : null);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -136,7 +138,7 @@ function InterviewPage() {
       setVoiceScores(null);
       setSecondsSpent(0);
 
-      // adaptive difficulty — backend score use cheyyi
+      // adaptive difficulty
       const actualScore = data.score ?? submittedScore ?? 0;
       const adaptedDifficulty =
         actualScore >= 8 ? "Hard" :
@@ -178,7 +180,6 @@ function InterviewPage() {
       }
 
       const finalAvg = Math.round(avg * 10) / 10;
-
       setFinalScore(finalAvg);
       setTotalTime(totalSec);
 
@@ -187,11 +188,8 @@ function InterviewPage() {
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          topic,
-          difficulty,
-          averageScore: finalAvg,
-          totalTime: totalSec,
-          questions: testResults,
+          topic, difficulty, averageScore: finalAvg,
+          totalTime: totalSec, questions: testResults,
         }),
       });
 
@@ -238,7 +236,6 @@ function InterviewPage() {
   const stopRecording = () => { mediaRecorder?.stop(); setIsRecording(false); };
 
   const fmt = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
-
   const scoreLevel = (s: number) => s >= 8 ? "Good" : s >= 5 ? "Medium" : "Bad";
   const scoreLabel = (s: number) => s >= 8 ? "Excellent" : s >= 5 ? "Solid" : "Needs Work";
 
@@ -297,8 +294,6 @@ function InterviewPage() {
               );
             })}
           </div>
-
-          {/* buttons */}
           <div style={{ textAlign: "center", marginTop: "32px" }}>
             <button className={styles.btnPrimary} onClick={() => router.push("/profile")}>
               View Full Progress →
@@ -351,18 +346,17 @@ function InterviewPage() {
         </div>
       ) : (
         <>
-          {/* Timer bar with adaptive difficulty badge */}
+          {/* AI Status Indicator — WebSocket powered! */}
           <AIStatusIndicator status={status} message={lastMessage?.message} />
+
+          {/* Timer bar with adaptive difficulty badge */}
           <div className={styles.timerBar}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <span className={`${styles.timerDot} ${timerClass}`} />
               <span className={styles.timerLabel}>Time on question</span>
             </div>
             <span style={{
-              fontSize: "11px",
-              padding: "3px 10px",
-              borderRadius: "20px",
-              fontWeight: 700,
+              fontSize: "11px", padding: "3px 10px", borderRadius: "20px", fontWeight: 700,
               background: difficulty === "Hard" ? "rgba(244,63,94,0.15)" : difficulty === "Easy" ? "rgba(52,211,153,0.15)" : "rgba(129,140,248,0.15)",
               color: difficulty === "Hard" ? "#f43f5e" : difficulty === "Easy" ? "#34d399" : "#818cf8",
               border: `1px solid ${difficulty === "Hard" ? "#f43f5e" : difficulty === "Easy" ? "#34d399" : "#818cf8"}`,
