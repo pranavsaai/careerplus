@@ -2,13 +2,10 @@ package com.pranav.interviewai.controller;
 
 import com.pranav.interviewai.entity.User;
 import com.pranav.interviewai.repository.UserRepository;
-
+import com.pranav.interviewai.service.EmailService;
 import jakarta.servlet.http.HttpServletResponse;
-
 import com.pranav.interviewai.config.JwtUtil;
-
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -25,6 +22,7 @@ public class AuthController {
     private final UserRepository userRepo;
     private final PasswordEncoder passwordEncoder;
     private final JwtUtil jwtUtil;
+    private final EmailService emailService; // NEW
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody User user) {
@@ -36,54 +34,60 @@ public class AuthController {
 
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setCreatedAt(LocalDateTime.now());
-
         userRepo.save(user);
+
+        // send welcome email async — don't block registration!
+        new Thread(() -> emailService.sendWelcomeEmail(
+            user.getEmail(),
+            user.getName() != null ? user.getName() : "there"
+        )).start();
 
         return ResponseEntity.ok(Map.of("message", "User registered"));
     }
 
     @PostMapping("/login")
-public ResponseEntity<?> login(
-        @RequestBody User request,
-        HttpServletResponse response) {
+    public ResponseEntity<?> login(
+            @RequestBody User request,
+            HttpServletResponse response) {
 
-    User user = userRepo.findByEmail(request.getEmail())
-            .orElseThrow(() -> new RuntimeException("User not found"));
+        User user = userRepo.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-    if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-        return ResponseEntity.badRequest()
-                .body(Map.of("error", "Invalid credentials"));
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid credentials"));
+        }
+
+        String token = jwtUtil.generateToken(user.getEmail());
+
+        ResponseCookie cookie = ResponseCookie.from("jwt", token)
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(-1)
+                .sameSite("Lax")
+                .build();
+
+        response.addHeader("Set-Cookie", cookie.toString());
+
+        return ResponseEntity.ok(Map.of(
+                "message", "Login successful",
+                "name", user.getName()
+        ));
     }
 
-    String token = jwtUtil.generateToken(user.getEmail());
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletResponse response) {
 
-    ResponseCookie cookie = ResponseCookie.from("jwt", token)
-            .httpOnly(true)
-            .secure(false) 
-            .path("/")
-            .maxAge(-1)
-            .sameSite("Lax")
-            .build();
+        ResponseCookie cookie = ResponseCookie.from("jwt", "")
+                .httpOnly(true)
+                .secure(false)
+                .path("/")
+                .maxAge(0)
+                .build();
 
-    response.addHeader("Set-Cookie", cookie.toString());
+        response.addHeader("Set-Cookie", cookie.toString());
 
-    return ResponseEntity.ok(Map.of(
-            "message", "Login successful",
-            "name", user.getName()
-    ));
-}
-@PostMapping("/logout")
-public ResponseEntity<?> logout(HttpServletResponse response) {
-
-    ResponseCookie cookie = ResponseCookie.from("jwt", "")
-            .httpOnly(true)
-            .secure(true)
-            .path("/")
-            .maxAge(0)
-            .build();
-
-    response.addHeader("Set-Cookie", cookie.toString());
-
-    return ResponseEntity.ok(Map.of("message", "Logged out"));
-}
+        return ResponseEntity.ok(Map.of("message", "Logged out"));
+    }
 }
