@@ -20,7 +20,6 @@ public class SecurityConfig {
 
     private final JwtFilter jwtFilter;
 
-    // your vercel frontend URL — set this as env variable FRONTEND_URL
     @Value("${frontend.url:http://localhost:3000}")
     private String frontendUrl;
 
@@ -38,6 +37,7 @@ public class SecurityConfig {
             )
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers("/api/auth/**").permitAll()
+                    .requestMatchers("/api/leaderboard/**").permitAll() // public leaderboard
                     .requestMatchers("/health").permitAll()
                     .requestMatchers("/actuator/**").permitAll()
                     .requestMatchers("/audio/**").permitAll()
@@ -52,8 +52,6 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-
-        // explicit origin instead of wildcard — required when allowCredentials=true
         config.setAllowedOrigins(List.of(frontendUrl, "http://localhost:3000"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
