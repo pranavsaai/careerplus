@@ -19,7 +19,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Service
@@ -31,7 +30,8 @@ public class InterviewService {
     private final AnswerRepository answerRepo;
     private final GroqService ai;
     private final InterviewAttemptRepository attemptRepository;
-    private final ResumeService resumeService; // NEW — for personalized questions
+    private final ResumeService resumeService;
+    private final CacheService cacheService; // NEW — Redis cache
 
     public Map<String, String> start(StartInterviewRequest req, String userId) {
 
@@ -42,24 +42,47 @@ public class InterviewService {
         s.setUserId(userId);
         sessionRepo.save(s);
 
-        // check if user has uploaded a resume → personalized questions!
         ResumeProfile resumeProfile = resumeService.getLatestProfile(userId);
 
         String questionText;
+        boolean personalized = resumeProfile != null;
 
-        if (resumeProfile != null) {
-            // generate personalized question based on resume skills
-            questionText = ai.generatePersonalizedQuestion(
-                req.getTopic(),
-                req.getDifficulty(),
-                resumeProfile.getSkills(),
-                resumeProfile.getTechnologies(),
-                resumeProfile.getExperienceLevel(),
-                resumeProfile.getDominantDomain()
+        if (personalized) {
+            // try cache first for personalized questions
+            String cached = cacheService.getRandomCachedQuestion(
+                req.getTopic(), req.getDifficulty()
             );
+
+            if (cached != null) {
+                System.out.println("Cache HIT — question from Redis!");
+                questionText = cached;
+            } else {
+                System.out.println("Cache MISS — generating from Groq...");
+                questionText = ai.generatePersonalizedQuestion(
+                    req.getTopic(),
+                    req.getDifficulty(),
+                    resumeProfile.getSkills(),
+                    resumeProfile.getTechnologies(),
+                    resumeProfile.getExperienceLevel(),
+                    resumeProfile.getDominantDomain()
+                );
+                // cache generated question for future use
+                cacheService.cacheQuestion(req.getTopic(), req.getDifficulty(), questionText);
+            }
         } else {
-            // fallback to generic question if no resume uploaded
-            questionText = ai.generateQuestion(req.getTopic(), req.getDifficulty());
+            // generic question — also cache it
+            String cached = cacheService.getRandomCachedQuestion(
+                req.getTopic(), req.getDifficulty()
+            );
+
+            if (cached != null) {
+                System.out.println("Cache HIT — generic question from Redis!");
+                questionText = cached;
+            } else {
+                System.out.println("Cache MISS — generating generic question...");
+                questionText = ai.generateQuestion(req.getTopic(), req.getDifficulty());
+                cacheService.cacheQuestion(req.getTopic(), req.getDifficulty(), questionText);
+            }
         }
 
         String modelAnswer = ai.generateModelAnswer(questionText);
@@ -74,8 +97,7 @@ public class InterviewService {
         response.put("sessionId", s.getId());
         response.put("questionId", q.getId());
         response.put("question", questionText);
-        // tell frontend if questions are personalized
-        response.put("personalized", resumeProfile != null ? "true" : "false");
+        response.put("personalized", personalized ? "true" : "false");
 
         return response;
     }
