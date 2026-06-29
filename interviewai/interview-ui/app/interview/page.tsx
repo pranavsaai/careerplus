@@ -41,7 +41,16 @@ function InterviewPage() {
   const [voiceScores, setVoiceScores] = useState<any>(null);
 
   const [loading, setLoading] = useState(false);
-  const { status, lastMessage } = useInterviewSocket(null); 
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/profile/summary", { credentials: "include" })
+      .then(r => r.json())
+      .then(d => setUserId(d.userId))
+      .catch(() => {});
+  }, []);
+
+  const { status, lastMessage } = useInterviewSocket(userId);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
